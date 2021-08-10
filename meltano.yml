@@ -1,0 +1,16 @@
+version: 1
+send_anonymous_usage_stats: true
+project_id: ec021d0b-7852-4ea5-a4f6-65756e52e5a5
+plugins:
+  extractors:
+  - name: tap-chromedata
+    namespace: tap_chromedata
+    executable: ./tap-chromedata.sh
+    capabilities:
+    - state
+    - catalog
+    - discover
+  loaders:
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
