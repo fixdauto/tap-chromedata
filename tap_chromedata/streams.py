@@ -14,7 +14,6 @@ from singer_sdk.streams import Stream
 #from tap_chromedata.client import acesvehiclemappingbaseStream
 import ftplib
 import io
-import pandas as pd
 import json
 from zipfile import ZipFile
 
@@ -55,7 +54,7 @@ class QuickDataStream(Stream):
         th.Property("~SubdivisionName~", th.StringType),
         th.Property("~SubdivisionID~", th.IntegerType),
         th.Property("~StyleID~", th.IntegerType),
-        th.Property("AutobuilderStyleID", th.StringType)
+        th.Property("~AutobuilderStyleID~", th.StringType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -115,6 +114,8 @@ class QuickDataStream(Stream):
 
                                     data[j]=data[j].decode('utf-8')
                                     tildcount=0
+                                    if '\r\n' in data[j]:
+                                        data[j]=data[j].replace('\r\n','')
                                     for i in range(len(data[j])):
                                         if data[j][i]=='~':
                                             if tildcount==0:
@@ -130,7 +131,18 @@ class QuickDataStream(Stream):
                                 for j in range(1,len(data)):
                                     row_dict={}
                                     for i in range(0,len(data[j])):
-                                        row_dict[colnames[i]]=data[j][i]
+                                        if data[j][i].isnumeric():
+                                            row_dict[colnames[i]]=int(data[j][i])
+                                        elif data[j][i].count(".")==1:
+                                            arr=data[j][i].split(".")
+                                            if arr[0].isnumeric() and arr[1].isnumeric():
+                                                row_dict[colnames[i]]=float(data[j][i])
+                                            else:
+                                                row_dict[colnames[i]]=data[j][i]
+                                        elif data[j][i]=='':
+                                            row_dict[colnames[i]]=None
+                                        else:
+                                            row_dict[colnames[i]]=data[j][i]
                                     data[j]=row_dict
                                 data=data[1:]
                                 for row in data:
@@ -214,7 +226,18 @@ class AcesLegacyVehicleSchemaStream(Stream):
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
-                                                row_dict[colnames[i]]=data[j][i]
+                                                if data[j][i].isnumeric():
+                                                    row_dict[colnames[i]]=int(data[j][i])
+                                                elif data[j][i].count(".")==1:
+                                                    arr=data[j][i].split(".")
+                                                    if arr[0].isnumeric() and arr[1].isnumeric():
+                                                        row_dict[colnames[i]]=float(data[j][i])
+                                                    else:
+                                                        row_dict[colnames[i]]=data[j][i]
+                                                elif data[j][i]=='':
+                                                    row_dict[colnames[i]]=None
+                                                else:
+                                                    row_dict[colnames[i]]=data[j][i]
                                             data[j]=row_dict
                                         data=data[1:]
                                         for row in data:
@@ -303,7 +326,18 @@ class AcesVehicleSchemaStream(Stream):
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
-                                                row_dict[colnames[i]]=data[j][i]
+                                                if data[j][i].isnumeric():
+                                                    row_dict[colnames[i]]=int(data[j][i])
+                                                elif data[j][i].count(".")==1:
+                                                    arr=data[j][i].split(".")
+                                                    if arr[0].isnumeric() and arr[1].isnumeric():
+                                                        row_dict[colnames[i]]=float(data[j][i])
+                                                    else:
+                                                        row_dict[colnames[i]]=data[j][i]
+                                                elif data[j][i]=='':
+                                                    row_dict[colnames[i]]=None
+                                                else:
+                                                    row_dict[colnames[i]]=data[j][i]
                                             data[j]=row_dict
                                         data=data[1:]
                                         for row in data:
@@ -399,7 +433,18 @@ class AcesVehicleConfigSchemaStream(Stream):
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
-                                                row_dict[colnames[i]]=data[j][i]
+                                                if data[j][i].isnumeric():
+                                                    row_dict[colnames[i]]=int(data[j][i])
+                                                elif data[j][i].count(".")==1:
+                                                    arr=data[j][i].split(".")
+                                                    if arr[0].isnumeric() and arr[1].isnumeric():
+                                                        row_dict[colnames[i]]=float(data[j][i])
+                                                    else:
+                                                        row_dict[colnames[i]]=data[j][i]
+                                                elif data[j][i]=='':
+                                                    row_dict[colnames[i]]=None
+                                                else:
+                                                    row_dict[colnames[i]]=data[j][i]
                                             data[j]=row_dict
                                         data=data[1:]
                                         for row in data:
@@ -489,7 +534,18 @@ class AcesVehicleMappingSchemaStream(Stream):
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
-                                                row_dict[colnames[i]]=data[j][i]
+                                                if data[j][i].isnumeric():
+                                                    row_dict[colnames[i]]=int(data[j][i])
+                                                elif data[j][i].count(".")==1:
+                                                    arr=data[j][i].split(".")
+                                                    if arr[0].isnumeric() and arr[1].isnumeric():
+                                                        row_dict[colnames[i]]=float(data[j][i])
+                                                    else:
+                                                        row_dict[colnames[i]]=data[j][i]
+                                                elif data[j][i]=='':
+                                                    row_dict[colnames[i]]=None
+                                                else:
+                                                    row_dict[colnames[i]]=data[j][i]
                                             data[j]=row_dict
                                         data=data[1:]
                                         for row in data:
