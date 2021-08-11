@@ -7,7 +7,6 @@ from singer_sdk import typing as th  # JSON schema typing helpers
 
 import ftplib
 import io
-import pandas as pd
 import json
 from zipfile import ZipFile
 
