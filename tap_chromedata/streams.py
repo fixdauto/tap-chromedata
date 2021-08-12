@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union, List, Iterable
 from singer_sdk import typing as th  # JSON Schema typing helpers
 
 from singer_sdk.streams import Stream
-
+import re
 #from tap_chromedata.client import chromedataStream
 #from tap_chromedata.client import aceslegacyvehiclebaseStream
 #from tap_chromedata.client import acesvehiclebaseStream
@@ -26,35 +26,35 @@ from zipfile import ZipFile
 class QuickDataStream(Stream):
     """Define custom stream."""
     name = "QuickData"
-    primary_keys = ["~AutobuilderStyleID~"]
+    primary_keys = ["AutobuilderStyleID"]
     replication_key = None
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
-        th.Property("~ModelYear~", th.IntegerType),
-        th.Property("~DivisionName~", th.StringType),
-        th.Property("~ModelName~", th.StringType),
-        th.Property("~HistStyleID~", th.IntegerType),
-        th.Property("~StyleName~", th.StringType),
-        th.Property("~StyleNameWOTrim~", th.StringType),
-        th.Property("~Trim~", th.StringType),
-        th.Property("~FullStyleCode~", th.StringType),
-        th.Property("~StyleSequence~", th.IntegerType),
-        th.Property("~MSRP~", th.NumberType),
-        th.Property("~Invoice~", th.NumberType),
-        th.Property("~Destination~", th.NumberType),
-        th.Property("~ModelEffectiveDate~", th.StringType),
-        th.Property("~ModelComment~", th.StringType),
-        th.Property("~ManufacturerName~", th.StringType),
-        th.Property("~ManufacturerID~", th.IntegerType),
-        th.Property("~DivisionID~", th.IntegerType),
-        th.Property("~HistModelID~", th.IntegerType),
-        th.Property("~MarketClass~", th.StringType),
-        th.Property("~MarketClassID~", th.IntegerType),
-        th.Property("~SubdivisionName~", th.StringType),
-        th.Property("~SubdivisionID~", th.IntegerType),
-        th.Property("~StyleID~", th.IntegerType),
-        th.Property("~AutobuilderStyleID~", th.StringType)
+        th.Property("model_year", th.IntegerType),
+        th.Property("division_name", th.StringType),
+        th.Property("model_name", th.StringType),
+        th.Property("hist_style_id", th.IntegerType),
+        th.Property("style_name", th.StringType),
+        th.Property("style_name_wo_trim", th.StringType),
+        th.Property("trim", th.StringType),
+        th.Property("full_style_code", th.StringType),
+        th.Property("style_sequence", th.IntegerType),
+        th.Property("msrp", th.NumberType),
+        th.Property("invoice", th.NumberType),
+        th.Property("destination", th.NumberType),
+        th.Property("model_effective_date", th.StringType),
+        th.Property("model_comment", th.StringType),
+        th.Property("manufacturer_name", th.StringType),
+        th.Property("manufacturer_id", th.IntegerType),
+        th.Property("division_id", th.IntegerType),
+        th.Property("hist_model_id", th.IntegerType),
+        th.Property("market_class", th.StringType),
+        th.Property("market_class_id", th.IntegerType),
+        th.Property("subdivision_name", th.StringType),
+        th.Property("subdivision_id", th.IntegerType),
+        th.Property("style_id", th.IntegerType),
+        th.Property("autobuilder_style_id", th.StringType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -72,17 +72,9 @@ class QuickDataStream(Stream):
         #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
-        #  NotImplementedError("The method is not yet implemented (TODO)")
+        def camel_to_snake(name):
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -100,14 +92,6 @@ class QuickDataStream(Stream):
                         ftp.retrbinary("RETR /"+innerinnerfile, flo.write)
                         flo.seek(0)
                         with ZipFile(flo) as archive:
-                            """
-                            with archive.open('DeepLink.txt') as fd:
-                                df = pd.read_csv(fd)
-                                df_dict=df.to_dict(orient='records')
-                                
-                                for row in df_dict:
-                                    yield row
-                            """
                             with archive.open('DeepLink.txt') as fd:
                                 data=fd.readlines()
                                 for j in range(len(data)):
@@ -128,6 +112,10 @@ class QuickDataStream(Stream):
                                     data[j] = data[j].split(',')
                                     
                                 colnames=data[0]
+                                for i in range(len(colnames)):
+                                    if '~' in colnames[i]:
+                                        colnames[i]=colnames[i].replace('~','')
+                                    colnames[i]=camel_to_snake(colnames[i])
                                 for j in range(1,len(data)):
                                     row_dict={}
                                     for i in range(0,len(data[j])):
@@ -152,11 +140,11 @@ class QuickDataStream(Stream):
 class AcesLegacyVehicleSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesLegacyVehicle"
-    primary_keys = ["~LegacyVehicleID~"]
+    primary_keys = ["legacy_vehicle_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("~VehicleConfigID~", th.IntegerType),
-        th.Property("~LegacyVehicleID~", th.IntegerType)
+        th.Property("vehicle_config_id", th.IntegerType),
+        th.Property("legacy_vehicle_id", th.IntegerType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -174,17 +162,9 @@ class AcesLegacyVehicleSchemaStream(Stream):
         #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
-        #  NotImplementedError("The method is not yet implemented (TODO)")
+        def camel_to_snake(name):
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -223,6 +203,10 @@ class AcesLegacyVehicleSchemaStream(Stream):
                                                         data[j]=data[j][:i]+' '+data[j][i+1:]
                                             data[j] = data[j].split(',')
                                         colnames=data[0]
+                                        for i in range(len(colnames)):
+                                            if '~' in colnames[i]:
+                                                colnames[i]=colnames[i].replace('~','')
+                                            colnames[i]=camel_to_snake(colnames[i])
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
@@ -247,16 +231,16 @@ class AcesLegacyVehicleSchemaStream(Stream):
 class AcesVehicleSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesVehicle"
-    primary_keys = ["~VehicleID~"]
+    primary_keys = ["vehicle_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("~VehicleID~", th.IntegerType),
-        th.Property("~YearID~", th.IntegerType),
-        th.Property("~MakeID~", th.IntegerType),
-        th.Property("~ModelID~", th.IntegerType),
-        th.Property("~SubModelID~", th.IntegerType),
-        th.Property("~RegionID~", th.IntegerType),
-        th.Property("~BaseVehicleID~", th.IntegerType)
+        th.Property("vehicle_id", th.IntegerType),
+        th.Property("year_id", th.IntegerType),
+        th.Property("make_id", th.IntegerType),
+        th.Property("model_id", th.IntegerType),
+        th.Property("sub_model_id", th.IntegerType),
+        th.Property("region_id", th.IntegerType),
+        th.Property("base_vehicle_id", th.IntegerType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -274,17 +258,9 @@ class AcesVehicleSchemaStream(Stream):
         #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
-        #  NotImplementedError("The method is not yet implemented (TODO)")
+        def camel_to_snake(name):
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -323,6 +299,10 @@ class AcesVehicleSchemaStream(Stream):
                                                         data[j]=data[j][:i]+' '+data[j][i+1:]
                                             data[j] = data[j].split(',')
                                         colnames=data[0]
+                                        for i in range(len(colnames)):
+                                            if '~' in colnames[i]:
+                                                colnames[i]=colnames[i].replace('~','')
+                                            colnames[i]=camel_to_snake(colnames[i])
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
@@ -348,22 +328,22 @@ class AcesVehicleSchemaStream(Stream):
 class AcesVehicleConfigSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesVehicleConfigVehicle"
-    primary_keys = ["~AcesVehicleConfigID~"]
+    primary_keys = ["aces_vehicle_config_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("~AcesVehicleConfigID~", th.IntegerType),
-        th.Property("~VehicleConfigID~", th.IntegerType),
-        th.Property("~VehicleID~", th.IntegerType),
-        th.Property("~BedConfigID~", th.IntegerType),
-        th.Property("~BodyStyleConfigID~", th.IntegerType),
-        th.Property("~BrakeConfigID~", th.IntegerType),
-        th.Property("~DriveTypeID~", th.IntegerType),
-        th.Property("~EngineConfigID~", th.IntegerType),
-        th.Property("~TransmissionID~", th.IntegerType),
-        th.Property("~MfrBodyCodeID~", th.IntegerType),
-        th.Property("~WheelBaseID~", th.IntegerType),
-        th.Property("~SpringTypeConfigID~", th.IntegerType),
-        th.Property("~SteeringConfigID~", th.IntegerType)
+        th.Property("aces_vehicle_config_id", th.IntegerType),
+        th.Property("vehicle_config_id", th.IntegerType),
+        th.Property("vehicle_id", th.IntegerType),
+        th.Property("bed_config_id", th.IntegerType),
+        th.Property("body_style_config_id", th.IntegerType),
+        th.Property("brake_config_id", th.IntegerType),
+        th.Property("drive_type_id", th.IntegerType),
+        th.Property("engine_config_id", th.IntegerType),
+        th.Property("transmission_id", th.IntegerType),
+        th.Property("mfr_body_code_id", th.IntegerType),
+        th.Property("wheel_base_id", th.IntegerType),
+        th.Property("spring_type_config_id", th.IntegerType),
+        th.Property("steering_config_id", th.IntegerType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -381,17 +361,9 @@ class AcesVehicleConfigSchemaStream(Stream):
         #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
-        #  NotImplementedError("The method is not yet implemented (TODO)")
+        def camel_to_snake(name):
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -430,6 +402,10 @@ class AcesVehicleConfigSchemaStream(Stream):
                                                         data[j]=data[j][:i]+' '+data[j][i+1:]
                                             data[j] = data[j].split(',')
                                         colnames=data[0]
+                                        for i in range(len(colnames)):
+                                            if '~' in colnames[i]:
+                                                colnames[i]=colnames[i].replace('~','')
+                                            colnames[i]=camel_to_snake(colnames[i])
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
@@ -455,15 +431,15 @@ class AcesVehicleConfigSchemaStream(Stream):
 class AcesVehicleMappingSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesVehicleMappingVehicle"
-    primary_keys = ["~AcesVehicleConfigID~"]
+    primary_keys = ["aces_vehicle_config_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("~AcesVehicleMappingID~", th.IntegerType),
-        th.Property("~VehicleMappingID~", th.IntegerType),
-        th.Property("~VehicleID~", th.IntegerType),
-        th.Property("~AcesVehicleConfigID~", th.IntegerType),
-        th.Property("~StyleID~", th.IntegerType),
-        th.Property("~OptionCodes~", th.StringType)
+        th.Property("aces_vehicle_mapping_id", th.IntegerType),
+        th.Property("vehicle_mapping_id", th.IntegerType),
+        th.Property("vehicle_id", th.IntegerType),
+        th.Property("aces_vehicle_config_id", th.IntegerType),
+        th.Property("style_id", th.IntegerType),
+        th.Property("option_codes", th.StringType)
     ).to_dict()
     @property
     def url_base(self) -> str:
@@ -481,18 +457,9 @@ class AcesVehicleMappingSchemaStream(Stream):
         #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
-        #  NotImplementedError("The method is not yet implemented (TODO)")
-        #print(self.config_jsonschema[0])
+        def camel_to_snake(name):
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -531,6 +498,10 @@ class AcesVehicleMappingSchemaStream(Stream):
                                                         data[j]=data[j][:i]+' '+data[j][i+1:]
                                             data[j] = data[j].split(',')
                                         colnames=data[0]
+                                        for i in range(len(colnames)):
+                                            if '~' in colnames[i]:
+                                                colnames[i]=colnames[i].replace('~','')
+                                            colnames[i]=camel_to_snake(colnames[i])
                                         for j in range(1,len(data)):
                                             row_dict={}
                                             for i in range(0,len(data[j])):
