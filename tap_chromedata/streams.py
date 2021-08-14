@@ -26,7 +26,7 @@ from zipfile import ZipFile
 class QuickDataStream(Stream):
     """Define custom stream."""
     name = "QuickData"
-    primary_keys = ["AutobuilderStyleID"]
+    primary_keys = ["autobuilder_style_id"]
     replication_key = None
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
@@ -140,7 +140,7 @@ class QuickDataStream(Stream):
 class AcesLegacyVehicleSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesLegacyVehicle"
-    primary_keys = ["legacy_vehicle_id"]
+    primary_keys = ["vehicle_config_id","legacy_vehicle_id"]
     replication_key = None
     schema = th.PropertiesList(
         th.Property("vehicle_config_id", th.IntegerType),
@@ -328,7 +328,7 @@ class AcesVehicleSchemaStream(Stream):
 class AcesVehicleConfigSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesVehicleConfigVehicle"
-    primary_keys = ["aces_vehicle_config_id"]
+    primary_keys = ["aces_vehicle_config_id","vehicle_config_id"]
     replication_key = None
     schema = th.PropertiesList(
         th.Property("aces_vehicle_config_id", th.IntegerType),
@@ -431,7 +431,7 @@ class AcesVehicleConfigSchemaStream(Stream):
 class AcesVehicleMappingSchemaStream(Stream):
     """Define custom stream."""
     name = "AcesVehicleMappingVehicle"
-    primary_keys = ["aces_vehicle_config_id"]
+    primary_keys = ["aces_vehicle_mapping_id"]
     replication_key = None
     schema = th.PropertiesList(
         th.Property("aces_vehicle_mapping_id", th.IntegerType),
