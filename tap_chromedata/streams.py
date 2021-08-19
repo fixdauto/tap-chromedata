@@ -1,4 +1,5 @@
 """Stream type classes for tap-chromedata."""
+import csv
 
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List, Iterable
@@ -7,74 +8,105 @@ from singer_sdk import typing as th  # JSON Schema typing helpers
 
 from singer_sdk.streams import Stream
 import re
-#from tap_chromedata.client import chromedataStream
-#from tap_chromedata.client import aceslegacyvehiclebaseStream
-#from tap_chromedata.client import acesvehiclebaseStream
-#from tap_chromedata.client import acesvehicleconfigbaseStream
-#from tap_chromedata.client import acesvehiclemappingbaseStream
 import ftplib
 import io
 import json
 from zipfile import ZipFile
 
-# TODO: Delete this is if not using json files for schema definition
-#SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
-# TODO: - Override `UsersStream` and `GroupsStream` with your own stream definition.
-#       - Copy-paste as many times as needed to create multiple stream types.
+"""Convert camelCase words to snake_case"""
+def camel_to_snake(name):
+    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+    
+"""Base stream class with config parameter getters, tranversers to ACES Mapping data and data cleaning"""
+class ChromeDataStream(Stream):
+    flo=""
+    @property
+    def url_base(self) -> str:
+        """Return the API URL root, configurable via tap settings."""
+        return self.config["FTP_URL"]
+    @property
+    def url_user(self) -> str:
+        """Return the API URL user, configurable via tap settings."""
+        return self.config["FTP_USER"]
+    
+    @property
+    def url_pass(self) -> str:
+        """Return the API URL password, configurable via tap settings."""
+        return self.config["FTP_PASS"]
+    """Function for traversing through ACES Mapping folder in the FTP Server"""
+    def reading_ftp(self):
+        ftp = ftplib.FTP(self.url_base)
+        ftp.login(self.url_user,self.url_pass)
+        files = ftp.nlst()
+        for file in files:
+            if file=="ACES":
+                innerfiles=ftp.nlst(file)
+                for innerfile in innerfiles:
+                    if ".zip" in innerfile:
+                        flo = io.BytesIO()
+                        ftp.retrbinary("RETR /"+innerfile, flo.write)
+                        flo.seek(0)
+                        self.flo=flo
+    """Function to read and preprocessing data to UTF-8, converting headers to snake case and removing ~ as the quoting character in the data"""
+    def data_cleaner(self,data):
+        for j in range(len(data)):
+            data[j]=data[j].decode('utf-8')
+        data[0]=camel_to_snake(data[0])
+        
+        colnames=data[0].split(",")
+        for j in range(len(colnames)):
+            colnames[j]=colnames[j].replace("~","")
+        
+            if '\r\n' in colnames[j]:
+                colnames[j]=colnames[j].replace("\r\n","")
+        datareader=csv.DictReader(data,quotechar='~',dialect='unix')
+        return datareader,colnames
 
-
-class QuickDataStream(Stream):
-    """Define custom stream."""
+"""Class for reading the Quickdata records for all the years, zipped in year-by-year folder in the FTP server"""
+class QuickDataStream(ChromeDataStream):
     name = "QuickData"
-    primary_keys = ["autobuilder_style_id"]
+    primary_keys = ["_autobuilder_style_id"]
     replication_key = None
-    # Optionally, you may also use `schema_filepath` in place of `schema`:
-    # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
-        th.Property("model_year", th.IntegerType),
-        th.Property("division_name", th.StringType),
-        th.Property("model_name", th.StringType),
-        th.Property("hist_style_id", th.IntegerType),
-        th.Property("style_name", th.StringType),
-        th.Property("style_name_wo_trim", th.StringType),
-        th.Property("trim", th.StringType),
-        th.Property("full_style_code", th.StringType),
-        th.Property("style_sequence", th.IntegerType),
+        th.Property("_model_year", th.IntegerType),
+        th.Property("_division_name", th.StringType),
+        th.Property("_model_name", th.StringType),
+        th.Property("_hist_style_id", th.IntegerType),
+        th.Property("_style_name", th.StringType),
+        th.Property("_style_name_wo_trim", th.StringType),
+        th.Property("_trim", th.StringType),
+        th.Property("_full_style_code", th.StringType),
+        th.Property("_style_sequence", th.IntegerType),
         th.Property("msrp", th.NumberType),
-        th.Property("invoice", th.NumberType),
-        th.Property("destination", th.NumberType),
-        th.Property("model_effective_date", th.StringType),
-        th.Property("model_comment", th.StringType),
-        th.Property("manufacturer_name", th.StringType),
-        th.Property("manufacturer_id", th.IntegerType),
-        th.Property("division_id", th.IntegerType),
-        th.Property("hist_model_id", th.IntegerType),
-        th.Property("market_class", th.StringType),
-        th.Property("market_class_id", th.IntegerType),
-        th.Property("subdivision_name", th.StringType),
-        th.Property("subdivision_id", th.IntegerType),
-        th.Property("style_id", th.IntegerType),
-        th.Property("autobuilder_style_id", th.StringType)
+        th.Property("_invoice", th.NumberType),
+        th.Property("_destination", th.NumberType),
+        th.Property("_model_effective_date", th.StringType),
+        th.Property("_model_comment", th.StringType),
+        th.Property("_manufacturer_name", th.StringType),
+        th.Property("_manufacturer_id", th.IntegerType),
+        th.Property("_division_id", th.IntegerType),
+        th.Property("_hist_model_id", th.IntegerType),
+        th.Property("_market_class", th.StringType),
+        th.Property("_market_class_id", th.IntegerType),
+        th.Property("_subdivision_name", th.StringType),
+        th.Property("_subdivision_id", th.IntegerType),
+        th.Property("_style_id", th.IntegerType),
+        th.Property("_autobuilder_style_id", th.StringType)
     ).to_dict()
     @property
     def url_base(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_URL"]
     @property
     def url_user(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
+        """Return the API URL user, configurable via tap settings."""
         return self.config["FTP_USER"]
     @property
     def url_pass(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
+        """Return the API URL password, configurable via tap settings."""
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        def camel_to_snake(name):
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
         ftp = ftplib.FTP(self.url_base)
         ftp.login(self.url_user,self.url_pass)
         files = ftp.nlst()
@@ -82,443 +114,221 @@ class QuickDataStream(Stream):
             if file=="QuickData_ALL":
                 innerfiles=ftp.nlst(file)
                 for innerfile in innerfiles:
-                    #innerfile=innerfile.split("/")[-1]
                     innerinnerfiles=ftp.nlst(innerfile)
                     for innerinnerfile in innerinnerfiles:
-                        #innerinnerfile=innerinnerfile.split("/")[-1]
-                        
-
                         flo = io.BytesIO()
                         ftp.retrbinary("RETR /"+innerinnerfile, flo.write)
                         flo.seek(0)
                         with ZipFile(flo) as archive:
                             with archive.open('DeepLink.txt') as fd:
-                                data=fd.readlines()
-                                for j in range(len(data)):
 
-                                    data[j]=data[j].decode('utf-8')
-                                    tildcount=0
-                                    if '\r\n' in data[j]:
-                                        data[j]=data[j].replace('\r\n','')
-                                    for i in range(len(data[j])):
-                                        if data[j][i]=='~':
-                                            if tildcount==0:
-                                                tildcount+=1
+                                data=fd.readlines()
+                                datareader,colnames=self.data_cleaner(data)
+                                for row in datareader:
+                                    for key in colnames:
+                                        if row[key]=='':
+                                            row[key]=None
+                                        elif 'string' in self.schema['properties'][key]['type']:
+                                            row[key]=row[key]
+                                        elif 'integer' in self.schema['properties'][key]['type']:
+                                            row[key]=int(row[key])
+                                        elif 'number' in self.schema['properties'][key]['type']:
+                                            if row[key].count(".")==1:
+                                                arr=row[key].split(".")
+                                                if arr[0].isnumeric() and arr[1].isnumeric():
+                                                    row[key]=float(row[key])
+                                                else:
+                                                    row[key]=row[key]
                                             else:
-                                                tildcount-=1
-                                        if data[j][i]==",":
-                                            if tildcount==1:
-                                                data[j]=data[j][:i]+' '+data[j][i+1:]
-                                    data[j] = data[j].split(',')
-                                    
-                                colnames=data[0]
-                                for i in range(len(colnames)):
-                                    if '~' in colnames[i]:
-                                        colnames[i]=colnames[i].replace('~','')
-                                    colnames[i]=camel_to_snake(colnames[i])
-                                for j in range(1,len(data)):
-                                    row_dict={}
-                                    for i in range(0,len(data[j])):
-                                        if data[j][i].isnumeric():
-                                            row_dict[colnames[i]]=int(data[j][i])
-                                        elif data[j][i].count(".")==1:
-                                            arr=data[j][i].split(".")
-                                            if arr[0].isnumeric() and arr[1].isnumeric():
-                                                row_dict[colnames[i]]=float(data[j][i])
-                                            else:
-                                                row_dict[colnames[i]]=data[j][i]
-                                        elif data[j][i]=='':
-                                            row_dict[colnames[i]]=None
+                                                row[key]=row[key]
+                                        
                                         else:
-                                            row_dict[colnames[i]]=data[j][i]
-                                    data[j]=row_dict
-                                data=data[1:]
-                                for row in data:
+                                            row[key]=row[key]
                                     yield row
         ftp.close()
-
-class AcesLegacyVehicleSchemaStream(Stream):
+"""Class for reading the ACES Legacy Vehicle records in the ACES Mapping folder of the FTP server"""
+class AcesLegacyVehicleSchemaStream(ChromeDataStream):
     """Define custom stream."""
     name = "AcesLegacyVehicle"
-    primary_keys = ["vehicle_config_id","legacy_vehicle_id"]
+    primary_keys = ["_vehicle_config_id","_legacy_vehicle_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("vehicle_config_id", th.IntegerType),
-        th.Property("legacy_vehicle_id", th.IntegerType)
+        th.Property("_vehicle_config_id", th.IntegerType),
+        th.Property("_legacy_vehicle_id", th.IntegerType)
     ).to_dict()
     @property
     def url_base(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_URL"]
     @property
     def url_user(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_USER"]
     @property
     def url_pass(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
         return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        def camel_to_snake(name):
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-        ftp = ftplib.FTP(self.url_base)
-        ftp.login(self.url_user,self.url_pass)
-        files = ftp.nlst()
-        for file in files:
-            if file=="ACES":
-                innerfiles=ftp.nlst(file)
-                #print(innerfiles)
-                for innerfile in innerfiles:
-                    if ".zip" in innerfile:
-                        #print(innerfile)
-                
-                        flo = io.BytesIO()
-                        ftp.retrbinary("RETR /"+innerfile, flo.write)
-                        flo.seek(0)
-                        with ZipFile(flo) as archive:
-                            for f in archive.filelist:
-                        
-                                if f.filename=="AcesLegacyVehicle.txt":
-                                    #print(f.filename)
-                                    with archive.open(f.filename) as fp:
-                                        data=fp.readlines()
-                                        for j in range(len(data)):
-                                            data[j]=data[j].decode('utf-8')
-                                            tildcount=0
-                                            if '\r\n' in data[j]:
-                                                data[j]=data[j].replace('\r\n','')
-                                            #print(data[j])
-                                            for i in range(len(data[j])):
-                                                if data[j][i]=='~':
-                                                    if tildcount==0:
-                                                        tildcount+=1
-                                                    else:
-                                                        tildcount-=1
-                                                if data[j][i]==",":
-                                                    if tildcount==1:
-                                                        data[j]=data[j][:i]+' '+data[j][i+1:]
-                                            data[j] = data[j].split(',')
-                                        colnames=data[0]
-                                        for i in range(len(colnames)):
-                                            if '~' in colnames[i]:
-                                                colnames[i]=colnames[i].replace('~','')
-                                            colnames[i]=camel_to_snake(colnames[i])
-                                        for j in range(1,len(data)):
-                                            row_dict={}
-                                            for i in range(0,len(data[j])):
-                                                if data[j][i].isnumeric():
-                                                    row_dict[colnames[i]]=int(data[j][i])
-                                                elif data[j][i].count(".")==1:
-                                                    arr=data[j][i].split(".")
-                                                    if arr[0].isnumeric() and arr[1].isnumeric():
-                                                        row_dict[colnames[i]]=float(data[j][i])
-                                                    else:
-                                                        row_dict[colnames[i]]=data[j][i]
-                                                elif data[j][i]=='':
-                                                    row_dict[colnames[i]]=None
-                                                else:
-                                                    row_dict[colnames[i]]=data[j][i]
-                                            data[j]=row_dict
-                                        data=data[1:]
-                                        for row in data:
-                                            yield row
-        ftp.close()
+        self.reading_ftp()
+        with ZipFile(self.flo) as archive:
+            with archive.open('AcesLegacyVehicle.txt') as fd:
 
-class AcesVehicleSchemaStream(Stream):
+                data=fd.readlines()
+                datareader,colnames=self.data_cleaner(data)
+                
+                for row in datareader:
+                    for key in colnames:
+                        if row[key]=='':
+                            row[key]=None
+                        elif 'string' in self.schema['properties'][key]['type']:
+                            row[key]=row[key]
+                        elif 'integer' in self.schema['properties'][key]['type']:
+                            row[key]=int(row[key])
+                        elif 'number' in self.schema['properties'][key]['type']:
+                            if row[key].count(".")==1:
+                                arr=row[key].split(".")
+                                if arr[0].isnumeric() and arr[1].isnumeric():
+                                    row[key]=float(row[key])
+                                else:
+                                    row[key]=row[key]
+                            else:
+                                row[key]=row[key]
+                        else:
+                            row[key]=row[key]
+                    yield row
+"""Class for reading the ACES Vehicle records in the ACES Mapping folder of the FTP server"""
+class AcesVehicleSchemaStream(ChromeDataStream):
     """Define custom stream."""
     name = "AcesVehicle"
-    primary_keys = ["vehicle_id"]
+    primary_keys = ["_vehicle_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("vehicle_id", th.IntegerType),
-        th.Property("year_id", th.IntegerType),
-        th.Property("make_id", th.IntegerType),
-        th.Property("model_id", th.IntegerType),
-        th.Property("sub_model_id", th.IntegerType),
-        th.Property("region_id", th.IntegerType),
-        th.Property("base_vehicle_id", th.IntegerType)
+        th.Property("_vehicle_id", th.IntegerType),
+        th.Property("_year_id", th.IntegerType),
+        th.Property("_make_id", th.IntegerType),
+        th.Property("_model_id", th.IntegerType),
+        th.Property("_sub_model_id", th.IntegerType),
+        th.Property("_region_id", th.IntegerType),
+        th.Property("_base_vehicle_id", th.IntegerType)
     ).to_dict()
-    @property
-    def url_base(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_URL"]
-    @property
-    def url_user(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_USER"]
-    @property
-    def url_pass(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        def camel_to_snake(name):
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-        ftp = ftplib.FTP(self.url_base)
-        ftp.login(self.url_user,self.url_pass)
-        files = ftp.nlst()
-        for file in files:
-            if file=="ACES":
-                innerfiles=ftp.nlst(file)
-                #print(innerfiles)
-                for innerfile in innerfiles:
-                    if ".zip" in innerfile:
-                        #print(innerfile)
+        self.reading_ftp()
+        with ZipFile(self.flo) as archive:
+            with archive.open('AcesVehicle.txt') as fd:
+
+                data=fd.readlines()
+                datareader,colnames=self.data_cleaner(data)
                 
-                        flo = io.BytesIO()
-                        ftp.retrbinary("RETR /"+innerfile, flo.write)
-                        flo.seek(0)
-                        with ZipFile(flo) as archive:
-                            for f in archive.filelist:
-                        
-                                if f.filename=="AcesVehicle.txt":
-                                    #print(f.filename)
-                                    with archive.open(f.filename) as fp:
-                                        data=fp.readlines()
-                                        for j in range(len(data)):
-                                            data[j]=data[j].decode('utf-8')
-                                            tildcount=0
-                                            if '\r\n' in data[j]:
-                                                data[j]=data[j].replace('\r\n','')
-                                            #print(data[j])
-                                            for i in range(len(data[j])):
-                                                if data[j][i]=='~':
-                                                    if tildcount==0:
-                                                        tildcount+=1
-                                                    else:
-                                                        tildcount-=1
-                                                if data[j][i]==",":
-                                                    if tildcount==1:
-                                                        data[j]=data[j][:i]+' '+data[j][i+1:]
-                                            data[j] = data[j].split(',')
-                                        colnames=data[0]
-                                        for i in range(len(colnames)):
-                                            if '~' in colnames[i]:
-                                                colnames[i]=colnames[i].replace('~','')
-                                            colnames[i]=camel_to_snake(colnames[i])
-                                        for j in range(1,len(data)):
-                                            row_dict={}
-                                            for i in range(0,len(data[j])):
-                                                if data[j][i].isnumeric():
-                                                    row_dict[colnames[i]]=int(data[j][i])
-                                                elif data[j][i].count(".")==1:
-                                                    arr=data[j][i].split(".")
-                                                    if arr[0].isnumeric() and arr[1].isnumeric():
-                                                        row_dict[colnames[i]]=float(data[j][i])
-                                                    else:
-                                                        row_dict[colnames[i]]=data[j][i]
-                                                elif data[j][i]=='':
-                                                    row_dict[colnames[i]]=None
-                                                else:
-                                                    row_dict[colnames[i]]=data[j][i]
-                                            data[j]=row_dict
-                                        data=data[1:]
-                                        for row in data:
-                                            yield row
-        ftp.close()
+                for row in datareader:
+                    for key in colnames:
+                        if row[key]=='':
+                            row[key]=None
+                        elif 'string' in self.schema['properties'][key]['type']:
+                            row[key]=row[key]
+                        elif 'integer' in self.schema['properties'][key]['type']:
+                            row[key]=int(row[key])
+                        elif 'number' in self.schema['properties'][key]['type']:
+                            if row[key].count(".")==1:
+                                arr=row[key].split(".")
+                                if arr[0].isnumeric() and arr[1].isnumeric():
+                                    row[key]=float(row[key])
+                                else:
+                                    row[key]=row[key]
+                            else:
+                                row[key]=row[key]
+                        else:
+                            row[key]=row[key]
+                    yield row
 
-
-class AcesVehicleConfigSchemaStream(Stream):
+"""Class for reading the ACES Vehicle Config records in the ACES Mapping folder of the FTP server"""
+class AcesVehicleConfigSchemaStream(ChromeDataStream):
     """Define custom stream."""
     name = "AcesVehicleConfigVehicle"
-    primary_keys = ["aces_vehicle_config_id","vehicle_config_id"]
+    primary_keys = ["_aces_vehicle_config_id","_vehicle_config_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("aces_vehicle_config_id", th.IntegerType),
-        th.Property("vehicle_config_id", th.IntegerType),
-        th.Property("vehicle_id", th.IntegerType),
-        th.Property("bed_config_id", th.IntegerType),
-        th.Property("body_style_config_id", th.IntegerType),
-        th.Property("brake_config_id", th.IntegerType),
-        th.Property("drive_type_id", th.IntegerType),
-        th.Property("engine_config_id", th.IntegerType),
-        th.Property("transmission_id", th.IntegerType),
-        th.Property("mfr_body_code_id", th.IntegerType),
-        th.Property("wheel_base_id", th.IntegerType),
-        th.Property("spring_type_config_id", th.IntegerType),
-        th.Property("steering_config_id", th.IntegerType)
+        th.Property("_aces_vehicle_config_id", th.IntegerType),
+        th.Property("_vehicle_config_id", th.IntegerType),
+        th.Property("_vehicle_id", th.IntegerType),
+        th.Property("_bed_config_id", th.IntegerType),
+        th.Property("_body_style_config_id", th.IntegerType),
+        th.Property("_brake_config_id", th.IntegerType),
+        th.Property("_drive_type_id", th.IntegerType),
+        th.Property("_engine_config_id", th.IntegerType),
+        th.Property("_transmission_id", th.IntegerType),
+        th.Property("_mfr_body_code_id", th.IntegerType),
+        th.Property("_wheel_base_id", th.IntegerType),
+        th.Property("_spring_type_config_id", th.IntegerType),
+        th.Property("_steering_config_id", th.IntegerType)
     ).to_dict()
-    @property
-    def url_base(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_URL"]
-    @property
-    def url_user(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_USER"]
-    @property
-    def url_pass(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        def camel_to_snake(name):
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-        ftp = ftplib.FTP(self.url_base)
-        ftp.login(self.url_user,self.url_pass)
-        files = ftp.nlst()
-        for file in files:
-            if file=="ACES":
-                innerfiles=ftp.nlst(file)
-                #print(innerfiles)
-                for innerfile in innerfiles:
-                    if ".zip" in innerfile:
-                        #print(innerfile)
+        self.reading_ftp()
+        with ZipFile(self.flo) as archive:
+            with archive.open('AcesVehicleConfig.txt') as fd:
+
+                data=fd.readlines()
+                datareader,colnames=self.data_cleaner(data)
                 
-                        flo = io.BytesIO()
-                        ftp.retrbinary("RETR /"+innerfile, flo.write)
-                        flo.seek(0)
-                        with ZipFile(flo) as archive:
-                            for f in archive.filelist:
-                        
-                                if f.filename=="AcesVehicleConfig.txt":
-                                    #print(f.filename)
-                                    with archive.open(f.filename) as fp:
-                                        data=fp.readlines()
-                                        for j in range(len(data)):
-                                            data[j]=data[j].decode('utf-8')
-                                            tildcount=0
-                                            if '\r\n' in data[j]:
-                                                data[j]=data[j].replace('\r\n','')
-                                            #print(data[j])
-                                            for i in range(len(data[j])):
-                                                if data[j][i]=='~':
-                                                    if tildcount==0:
-                                                        tildcount+=1
-                                                    else:
-                                                        tildcount-=1
-                                                if data[j][i]==",":
-                                                    if tildcount==1:
-                                                        data[j]=data[j][:i]+' '+data[j][i+1:]
-                                            data[j] = data[j].split(',')
-                                        colnames=data[0]
-                                        for i in range(len(colnames)):
-                                            if '~' in colnames[i]:
-                                                colnames[i]=colnames[i].replace('~','')
-                                            colnames[i]=camel_to_snake(colnames[i])
-                                        for j in range(1,len(data)):
-                                            row_dict={}
-                                            for i in range(0,len(data[j])):
-                                                if data[j][i].isnumeric():
-                                                    row_dict[colnames[i]]=int(data[j][i])
-                                                elif data[j][i].count(".")==1:
-                                                    arr=data[j][i].split(".")
-                                                    if arr[0].isnumeric() and arr[1].isnumeric():
-                                                        row_dict[colnames[i]]=float(data[j][i])
-                                                    else:
-                                                        row_dict[colnames[i]]=data[j][i]
-                                                elif data[j][i]=='':
-                                                    row_dict[colnames[i]]=None
-                                                else:
-                                                    row_dict[colnames[i]]=data[j][i]
-                                            data[j]=row_dict
-                                        data=data[1:]
-                                        for row in data:
-                                            yield row
-        ftp.close()
+                for row in datareader:
+                    for key in colnames:
+                        if row[key]=='':
+                            row[key]=None
+                        elif 'string' in self.schema['properties'][key]['type']:
+                            row[key]=row[key]
+                        elif 'integer' in self.schema['properties'][key]['type']:
+                            row[key]=int(row[key])
+                        elif 'number' in self.schema['properties'][key]['type']:
+                            if row[key].count(".")==1:
+                                arr=row[key].split(".")
+                                if arr[0].isnumeric() and arr[1].isnumeric():
+                                    row[key]=float(row[key])
+                                else:
+                                    row[key]=row[key]
+                            else:
+                                row[key]=row[key]
+                        else:
+                            row[key]=row[key]
+                    yield row
 
-
-class AcesVehicleMappingSchemaStream(Stream):
+"""Class for reading the ACES Vehicle Mapping records in the ACES Mapping folder of the FTP server"""
+class AcesVehicleMappingSchemaStream(ChromeDataStream):
     """Define custom stream."""
     name = "AcesVehicleMappingVehicle"
-    primary_keys = ["aces_vehicle_mapping_id"]
+    primary_keys = ["_aces_vehicle_mapping_id"]
     replication_key = None
     schema = th.PropertiesList(
-        th.Property("aces_vehicle_mapping_id", th.IntegerType),
-        th.Property("vehicle_mapping_id", th.IntegerType),
-        th.Property("vehicle_id", th.IntegerType),
-        th.Property("aces_vehicle_config_id", th.IntegerType),
-        th.Property("style_id", th.IntegerType),
-        th.Property("option_codes", th.StringType)
+        th.Property("_aces_vehicle_mapping_id", th.IntegerType),
+        th.Property("_vehicle_mapping_id", th.IntegerType),
+        th.Property("_vehicle_id", th.IntegerType),
+        th.Property("_aces_vehicle_config_id", th.IntegerType),
+        th.Property("_style_id", th.IntegerType),
+        th.Property("_option_codes", th.StringType)
     ).to_dict()
-    @property
-    def url_base(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_URL"]
-    @property
-    def url_user(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_USER"]
-    @property
-    def url_pass(self) -> str:
-        """Return the API URL root, configurable via tap settings."""
-        #print(self.config["FTP_URL"],self.config["FTP_USER"],self.config["FTP_PASS"])
-        return self.config["FTP_PASS"]
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        def camel_to_snake(name):
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-        ftp = ftplib.FTP(self.url_base)
-        ftp.login(self.url_user,self.url_pass)
-        files = ftp.nlst()
-        for file in files:
-            if file=="ACES":
-                innerfiles=ftp.nlst(file)
-                #print(innerfiles)
-                for innerfile in innerfiles:
-                    if ".zip" in innerfile:
-                        #print(innerfile)
+        self.reading_ftp()
+        with ZipFile(self.flo) as archive:
+            with archive.open('AcesVehicleMapping.txt') as fd:
+
+                data=fd.readlines()
+                datareader,colnames=self.data_cleaner(data)
                 
-                        flo = io.BytesIO()
-                        ftp.retrbinary("RETR /"+innerfile, flo.write)
-                        flo.seek(0)
-                        with ZipFile(flo) as archive:
-                            for f in archive.filelist:
-                        
-                                if f.filename=="AcesVehicleMapping.txt":
-                                    #print(f.filename)
-                                    with archive.open(f.filename) as fp:
-                                        data=fp.readlines()
-                                        for j in range(len(data)):
-                                            data[j]=data[j].decode('utf-8')
-                                            tildcount=0
-                                            if '\r\n' in data[j]:
-                                                data[j]=data[j].replace('\r\n','')
-                                            #print(data[j])
-                                            for i in range(len(data[j])):
-                                                if data[j][i]=='~':
-                                                    if tildcount==0:
-                                                        tildcount+=1
-                                                    else:
-                                                        tildcount-=1
-                                                if data[j][i]==",":
-                                                    if tildcount==1:
-                                                        data[j]=data[j][:i]+' '+data[j][i+1:]
-                                            data[j] = data[j].split(',')
-                                        colnames=data[0]
-                                        for i in range(len(colnames)):
-                                            if '~' in colnames[i]:
-                                                colnames[i]=colnames[i].replace('~','')
-                                            colnames[i]=camel_to_snake(colnames[i])
-                                        for j in range(1,len(data)):
-                                            row_dict={}
-                                            for i in range(0,len(data[j])):
-                                                if data[j][i].isnumeric():
-                                                    row_dict[colnames[i]]=int(data[j][i])
-                                                elif data[j][i].count(".")==1:
-                                                    arr=data[j][i].split(".")
-                                                    if arr[0].isnumeric() and arr[1].isnumeric():
-                                                        row_dict[colnames[i]]=float(data[j][i])
-                                                    else:
-                                                        row_dict[colnames[i]]=data[j][i]
-                                                elif data[j][i]=='':
-                                                    row_dict[colnames[i]]=None
-                                                else:
-                                                    row_dict[colnames[i]]=data[j][i]
-                                            data[j]=row_dict
-                                        data=data[1:]
-                                        for row in data:
-                                            yield row
-        ftp.close()
+                for row in datareader:
+                    for key in colnames:
+                        if row[key]=='':
+                            row[key]=None
+                        elif 'string' in self.schema['properties'][key]['type']:
+                            row[key]=row[key]
+                        elif 'integer' in self.schema['properties'][key]['type']:
+                            row[key]=int(row[key])
+                        elif 'number' in self.schema['properties'][key]['type']:
+                            if row[key].count(".")==1:
+                                arr=row[key].split(".")
+                                if arr[0].isnumeric() and arr[1].isnumeric():
+                                    row[key]=float(row[key])
+                                else:
+                                    row[key]=row[key]
+                            else:
+                                row[key]=row[key]
+                        else:
+                            row[key]=row[key]
+                    yield row
