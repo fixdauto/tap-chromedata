@@ -36,9 +36,9 @@ class Tapchromedata(Tap):
 
     # TODO: Update this section with the actual config values you expect:
     config_jsonschema = th.PropertiesList(
-        th.Property("FTP_URL", th.StringType, required=True),
-        th.Property("FTP_USER", th.StringType, required=True),
-        th.Property("FTP_PASS", th.StringType)
+        th.Property("TAP_CHROMEDATA_FTP_URL", th.StringType, required=True),
+        th.Property("TAP_CHROMEDATA_FTP_USER", th.StringType, required=True),
+        th.Property("TAP_CHROMEDATA_FTP_PASS", th.StringType)
     ).to_dict()
     
     def discover_streams(self) -> List[Stream]:
