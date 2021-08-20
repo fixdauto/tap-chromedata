@@ -4,19 +4,24 @@
 
 Built with the Meltano [SDK](https://gitlab.com/meltano/sdk) for Singer Taps.
 
+It uses the Chromedata API to fetch data from an FTP server containing Various Make, Model, Year, Style data and the mapping to [ACES dataset](https://www.autocare.org/data-and-information/data-standards/aftermarket-catalog-exchange-standard-(aces)) 
 ## Installation
 
-- [ ] `Developer TODO:` Update the below as needed to correctly describe the install procedure. For instance, if you do not have a PyPi repo, or if you want users to directly install from your git repo, you can modify this step as appropriate.
-
 ```bash
-pipx install tap-chromedata
+pip install tap-chromedata
 ```
 
 ## Configuration
 
 ### Accepted Config Options
 
-- [ ] `Developer TODO:` Provide a list of config options accepted by the tap.
+```js
+{
+  "TAP_CHROMEDATA_FTP_URL": "ftp.chromedata.com",
+  "TAP_CHROMEDATA_FTP_USER": "some_username",
+  "TAP_CHROMEDATA_FTP_PASS": "some_password"
+}
+```
 
 A full list of supported settings and capabilities for this
 tap is available by running:
@@ -27,7 +32,7 @@ tap-chromedata --about
 
 ### Source Authentication and Authorization
 
-- [ ] `Developer TODO:` If your tap requires special access on the source system, or any special authentication requirements, provide those here.
+Use of the API and accessing the FTP Server requires a Username and Password
 
 ## Usage
 
@@ -40,10 +45,6 @@ tap-chromedata --version
 tap-chromedata --help
 tap-chromedata --config CONFIG --discover > ./catalog.json
 ```
-
-## Developer Resources
-
-- [ ] `Developer TODO:` As a first step, scan the entire project for the text "`TODO:`" and complete any recommended steps, deleting the "TODO" references once completed.
 
 ### Initialize your Development Environment
 
