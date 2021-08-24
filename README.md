@@ -17,9 +17,9 @@ pip install tap-chromedata
 
 ```js
 {
-  "TAP_CHROMEDATA_FTP_URL": "ftp.chromedata.com",
-  "TAP_CHROMEDATA_FTP_USER": "some_username",
-  "TAP_CHROMEDATA_FTP_PASS": "some_password"
+  "ftp_url": "ftp.chromedata.com",
+  "ftp_user": "some_username",
+  "ftp_pass": "some_password"
 }
 ```
 
