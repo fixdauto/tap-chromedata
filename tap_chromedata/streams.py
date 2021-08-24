@@ -28,16 +28,16 @@ class ChromeDataStream(Stream):
     @property
     def url_base(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        return self.config["tap_chromedata_ftp_url"]
+        return self.config["ftp_url"]
     @property
     def url_user(self) -> str:
         """Return the API URL user, configurable via tap settings."""
-        return self.config["tap_chromedata_ftp_user"]
+        return self.config["ftp_user"]
     
     @property
     def url_pass(self) -> str:
         """Return the API URL password, configurable via tap settings."""
-        return self.config["tap_chromedata_ftp_pass"]
+        return self.config["ftp_pass"]
     
     def datatype_check(self,schema,row,colnames):
         for key in colnames:
